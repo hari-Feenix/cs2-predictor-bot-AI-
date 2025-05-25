@@ -25,12 +25,11 @@ def get_upcoming_matches():
     matches = _load_matches()
     if not matches:
         prompt = "Generate 5 upcoming professional Counter-Strike 2 matches. Include match_id, time (UTC, format %Y-%m-%d %H:%M:%S), team1, and team2. Format as JSON."
-       client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-response = client.chat.completions.create(
-    model="gpt-4",
-    messages=[{"role": "user", "content": prompt}]
-)
-
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}]
+        )
         matches = eval(response['choices'][0]['message']['content'])
         _save_matches(matches)
     return matches
