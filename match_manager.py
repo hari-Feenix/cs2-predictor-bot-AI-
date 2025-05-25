@@ -35,7 +35,8 @@ def get_upcoming_matches():
             content = response.choices[0].message.content
             print("=== OpenAI Response ===")
             print(content)
-            matches = eval(content)
+            import json
+            matches = json.loads(content)
             _save_matches(matches)
         except Exception as e:
             print(f"[ERROR] Failed to parse matches: {e}")
