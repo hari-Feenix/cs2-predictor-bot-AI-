@@ -33,7 +33,7 @@ async def predict(ctx, match_id, team_name):
 
 @bot.command()
 async def leaderboard(ctx):
-    lb = get_leaderboard(bot)
+    lb = await get_leaderboard(bot)
     await ctx.send(lb)
 
 @tasks.loop(hours=1)
