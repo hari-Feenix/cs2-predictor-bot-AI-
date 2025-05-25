@@ -33,6 +33,8 @@ def get_upcoming_matches():
 
         try:
             content = response.choices[0].message.content
+            print("=== OpenAI Response ===")
+            print(content)
             matches = eval(content)
             _save_matches(matches)
         except Exception as e:
