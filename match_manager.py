@@ -9,8 +9,11 @@ MATCH_DB = 'data/matches.json'
 def _load_matches():
     try:
         with open(MATCH_DB, 'r') as f:
-            return json.load(f)
-    except:
+            matches = json.load(f)
+            print(f"[DEBUG] Loaded match cache: {matches}")
+            return matches
+    except Exception as e:
+        print("[DEBUG] Failed to load matches.json:", e)
         return []
 
 def _save_matches(matches):
@@ -18,8 +21,8 @@ def _save_matches(matches):
         json.dump(matches, f, indent=2)
 
 def get_upcoming_matches():
-    matches = _load_matches()
-    if not matches:
+    matches = []
+    print("[DEBUG] Forcing OpenAI call to generate matches")
         try:
             print("[DEBUG] Starting OpenAI API call")
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
