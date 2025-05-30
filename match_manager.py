@@ -16,9 +16,9 @@ MATCH_DB = "data/matches.json"
 
 def _load_matches():
     try:
-        with open(MATCH_DB, "r") as f:
+        with open(MATCH_DB, "r", encoding="utf-8") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
         return []
 
 def _save_matches(matches):
