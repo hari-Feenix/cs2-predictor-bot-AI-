@@ -11,8 +11,7 @@ def _load_matches():
     try:
         with open(MATCH_DB, 'r') as f:
             return json.load(f)
-    except Exception as e:
-        print(f"[DEBUG] Failed to load matches.json: {e}")
+    except Exception:
         return []
 
 def _save_matches(matches):
@@ -21,77 +20,55 @@ def _save_matches(matches):
 
 def get_upcoming_matches():
     print(f"[DEBUG] PANDASCORE_API_KEY = {PANDASCORE_API_KEY}")
-    print("[DEBUG] Fetching matches from PandaScore...")
-    
-    headers = {
-        "Authorization": f"Bearer {PANDASCORE_API_KEY}"
-    }
-
+    headers = {"Authorization": f"Bearer {PANDASCORE_API_KEY}"}
     url = "https://api.pandascore.co/cs2/matches/upcoming?per_page=5"
 
     try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-
-        print("[DEBUG] Raw PandaScore response:")
+        res = requests.get(url, headers=headers)
+        res.raise_for_status()
+        data = res.json()
+        print("[DEBUG] Raw API response:")
         print(json.dumps(data, indent=2))
 
         matches = []
         for match in data:
-            if not match.get('opponents') or len(match['opponents']) < 2:
-                continue  # skip incomplete entries
-
-            team1 = match['opponents'][0]['opponent']['name']
-            team2 = match['opponents'][1]['opponent']['name']
-            start_time = match.get('begin_at') or match.get('scheduled_at') or ""
-
-            matches.append({
-                "match_id": str(match['id']),
-                "time": start_time,
-                "team1": team1,
-                "team2": team2
-            })
+            opponents = match.get("opponents", [])
+            if len(opponents) < 2:
+                continue
+            match_info = {
+                "match_id": str(match["id"]),
+                "time": match.get("begin_at") or match.get("scheduled_at"),
+                "team1": opponents[0]["opponent"]["name"],
+                "team2": opponents[1]["opponent"]["name"]
+            }
+            matches.append(match_info)
 
         _save_matches(matches)
-        print(f"[DEBUG] Saved {len(matches)} matches to cache.")
         return matches
 
     except Exception as e:
-        print(f"[ERROR] Failed to fetch upcoming matches from PandaScore: {e}")
+        print(f"[ERROR] Failed to get matches: {e}")
         return []
 
 def resolve_matches():
+    headers = {"Authorization": f"Bearer {PANDASCORE_API_KEY}"}
     matches = _load_matches()
-    if not matches:
-        print("[DEBUG] No matches to resolve.")
-        return []
-
-    headers = {
-        "Authorization": f"Bearer {PANDASCORE_API_KEY}"
-    }
-
-    resolved = []
-    unresolved = []
+    resolved, unresolved = [], []
 
     for match in matches:
-        match_id = match['match_id']
+        match_id = match["match_id"]
         url = f"https://api.pandascore.co/matches/{match_id}"
-        
+
         try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            match_data = response.json()
+            res = requests.get(url, headers=headers)
+            res.raise_for_status()
+            data = res.json()
 
-            if match_data.get("status") == "finished":
-                winner_data = match_data.get("winner")
-                winner = winner_data.get("name") if winner_data else None
-
+            if data.get("status") == "finished":
+                winner = data.get("winner", {}).get("name")
                 if winner:
-                    resolved.append(f"Match {match_id} is over! Winner: **{winner}**")
+                    resolved.append(f"✅ Match {match_id} done! Winner: **{winner}**")
                     finalize_predictions(match_id, winner)
-                else:
-                    resolved.append(f"Match {match_id} is over, but winner not found.")
             else:
                 unresolved.append(match)
 
