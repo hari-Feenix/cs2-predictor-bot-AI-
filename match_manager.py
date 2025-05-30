@@ -6,10 +6,13 @@ from prediction_manager import predictions, update_leaderboard
 
 PANDASCORE_API_KEY = os.getenv("PANDASCORE_API_KEY")
 MATCHES_FILE = "data/matches.json"
+LOG_FILE = "data/logs.json"
+
 HEADERS = {
     "Authorization": f"Bearer {PANDASCORE_API_KEY}"
 }
 CSGO_MATCHES_ENDPOINT = "https://api.pandascore.co/csgo/matches/upcoming"
+CSGO_MATCH_DETAILS_ENDPOINT = "https://api.pandascore.co/csgo/matches"
 
 def fetch_upcoming_matches(limit=5):
     params = {"per_page": limit}
@@ -51,6 +54,37 @@ def get_upcoming_matches():
 
     return simplified
 
+def get_winner_from_pandascore(match_id):
+    try:
+        response = requests.get(
+            f"{CSGO_MATCH_DETAILS_ENDPOINT}/{match_id}",
+            headers=HEADERS
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data["winner"]["name"] if data.get("winner") else None
+    except Exception as e:
+        print(f"⚠️ Failed to fetch winner for match {match_id}: {e}")
+    return None
+
+def log_correct_prediction(user_id, match_id, team):
+    log = []
+    try:
+        with open(LOG_FILE, "r", encoding="utf-8") as f:
+            log = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    log.append({
+        "user_id": user_id,
+        "match_id": match_id,
+        "team": team,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+
+    with open(LOG_FILE, "w", encoding="utf-8") as f:
+        json.dump(log, f, indent=2)
+
 def resolve_matches():
     try:
         with open(MATCHES_FILE, "r", encoding="utf-8") as f:
@@ -71,19 +105,28 @@ def resolve_matches():
             try:
                 match_time = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
             except ValueError:
-                match_time = now  # fallback
+                match_time = now
         else:
             match_time = now
 
         if match_time < now:
-            winner = match.get("team1")  # Simulated winner
+            winner = get_winner_from_pandascore(match_id)
+            if not winner:
+                unresolved.append(match)
+                continue
+
             predictions_for_match = predictions.get(match_id, {})
+            mentions = []
 
             for user_id, predicted_team in predictions_for_match.items():
                 correct = (predicted_team == winner)
                 update_leaderboard(user_id, correct)
+                if correct:
+                    log_correct_prediction(user_id, match_id, winner)
+                    mentions.append(f"<@{user_id}>")
 
-            msg = f"{match['team1']} vs {match['team2']} - Winner: {winner} ✅"
+            mention_text = "🎉 " + ", ".join(mentions) + " guessed correctly!" if mentions else "😢 No one got it right."
+            msg = f"{match['team1']} vs {match['team2']} - Winner: **{winner}** ✅\n{mention_text}"
             resolved_msgs.append(msg)
         else:
             unresolved.append(match)
