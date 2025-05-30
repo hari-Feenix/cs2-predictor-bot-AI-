@@ -10,7 +10,10 @@ def _load_json(file_path):
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+        # corrupted or non-json file
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write("{}")
         return {}
 
 def _save_json(data, file_path):
