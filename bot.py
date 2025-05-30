@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 import os
 from dotenv import load_dotenv
 from match_manager import get_upcoming_matches, resolve_matches
-from prediction_manager import add_prediction
+from prediction_manager import predictions, save_prediction, update_leaderboard, get_leaderboard
 from leaderboard_manager import get_leaderboard
 
 load_dotenv()
