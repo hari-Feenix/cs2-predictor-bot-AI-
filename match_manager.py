@@ -2,7 +2,7 @@ import os
 import json
 import requests
 from datetime import datetime
-from prediction_manager import predictions, save_prediction, update_leaderboard, get_leaderboard
+from prediction_manager import predictions, update_leaderboard
 
 PANDASCORE_API_KEY = os.getenv("PANDASCORE_API_KEY")
 MATCHES_FILE = "data/matches.json"
@@ -10,7 +10,6 @@ HEADERS = {
     "Authorization": f"Bearer {PANDASCORE_API_KEY}"
 }
 CSGO_MATCHES_ENDPOINT = "https://api.pandascore.co/csgo/matches/upcoming"
-
 
 def fetch_upcoming_matches(limit=5):
     params = {"per_page": limit}
@@ -21,7 +20,6 @@ def fetch_upcoming_matches(limit=5):
     except Exception as e:
         print(f"❌ Error fetching matches: {e}")
         return []
-
 
 def get_upcoming_matches():
     matches = fetch_upcoming_matches()
@@ -53,7 +51,6 @@ def get_upcoming_matches():
 
     return simplified
 
-
 def resolve_matches():
     try:
         with open(MATCHES_FILE, "r", encoding="utf-8") as f:
@@ -67,23 +64,27 @@ def resolve_matches():
     now = datetime.utcnow()
 
     for match in matches:
-        # For testing, we assume the match is complete if start_time < now
-        if match.get("start_time"):
+        match_id = match.get("id")
+        start_time = match.get("start_time")
+
+        if start_time:
             try:
-                match_time = datetime.fromisoformat(match["start_time"].replace("Z", "+00:00"))
+                match_time = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
             except ValueError:
                 match_time = now  # fallback
         else:
             match_time = now
 
         if match_time < now:
-            user_prediction = predictions.get(match["id"])
-            if user_prediction:
-                # Mock winner for now
-                winner = match["team1"]  # or use actual API if available
-                update_leaderboard(user_prediction["user"], winner == user_prediction["predicted"])
-                msg = f"{match['team1']} vs {match['team2']} - Winner: {winner} ✅"
-                resolved_msgs.append(msg)
+            winner = match.get("team1")  # Simulated winner
+            predictions_for_match = predictions.get(match_id, {})
+
+            for user_id, predicted_team in predictions_for_match.items():
+                correct = (predicted_team == winner)
+                update_leaderboard(user_id, correct)
+
+            msg = f"{match['team1']} vs {match['team2']} - Winner: {winner} ✅"
+            resolved_msgs.append(msg)
         else:
             unresolved.append(match)
 

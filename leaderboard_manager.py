@@ -13,6 +13,10 @@ async def get_leaderboard(bot):
     sorted_lb = sorted(leaderboard.items(), key=lambda x: x[1], reverse=True)
     lines = ["**🏆 Leaderboard:**"]
     for uid, score in sorted_lb[:10]:
-        user = await bot.fetch_user(int(uid))
-        lines.append(f"{user.name}: {score} pts")
+        try:
+            user = await bot.fetch_user(int(uid))
+            name = user.name
+        except:
+            name = f"User {uid}"
+        lines.append(f"{name}: {score} pts")
     return '\n'.join(lines)

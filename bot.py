@@ -27,7 +27,7 @@ async def matches(ctx):
         return
     response = "**Upcoming Matches:**\n"
     for m in matches:
-        response += f"**ID:** `{m['match_id']}` | {m['team1']} vs {m['team2']} | {m['time']}\n"
+        response += f"**ID:** `{m['id']}` | {m['team1']} vs {m['team2']} | {m['start_time']}\n"
     await ctx.send(response)
 
 @bot.command()
