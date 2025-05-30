@@ -1,19 +1,17 @@
-from openai import OpenAI
 import os
 import json
+import requests
 from datetime import datetime
-import random
+from prediction_manager import finalize_predictions
 
+PANDASCORE_API_KEY = os.getenv("PANDASCORE_API_KEY")
 MATCH_DB = 'data/matches.json'
 
 def _load_matches():
     try:
         with open(MATCH_DB, 'r') as f:
-            matches = json.load(f)
-            print(f"[DEBUG] Loaded match cache: {matches}")
-            return matches
-    except Exception as e:
-        print("[DEBUG] Failed to load matches.json:", e)
+            return json.load(f)
+    except:
         return []
 
 def _save_matches(matches):
@@ -21,59 +19,66 @@ def _save_matches(matches):
         json.dump(matches, f, indent=2)
 
 def get_upcoming_matches():
-    matches = []
-    print("[DEBUG] Forcing OpenAI call to generate matches")
+    print("[DEBUG] Fetching matches from PandaScore...")
+    headers = {
+        "Authorization": f"Bearer {PANDASCORE_API_KEY}"
+    }
+    url = "https://api.pandascore.co/cs2/matches/upcoming?per_page=5"
+    
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        matches = []
 
-        prompt = (
-            "Generate 5 upcoming professional Counter-Strike 2 matches. "
-            "Each match should be a dictionary with match_id, time (format: YYYY-MM-DD HH:MM:SS), "
-            "team1, and team2. Format the entire response as a JSON array with no explanation."
-        )
+        for match in data:
+            if not match['opponents'] or len(match['opponents']) < 2:
+                continue
+            team1 = match['opponents'][0]['opponent']['name']
+            team2 = match['opponents'][1]['opponent']['name']
+            matches.append({
+                "match_id": str(match['id']),
+                "time": match['begin_at'],
+                "team1": team1,
+                "team2": team2
+            })
 
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        content = response.choices[0].message.content.strip()
-        print("=== OpenAI Response ===")
-        print(content)
-
-        try:
-            matches = json.loads(content)
-            _save_matches(matches)
-        except Exception as parse_err:
-            print("[ERROR] JSON parsing failed.")
-            print(f"Parse Exception: {parse_err}")
-            print("Trying eval() fallback.")
-            matches = eval(content)
-            _save_matches(matches)
+        _save_matches(matches)
+        print(f"[DEBUG] Saved {len(matches)} matches.")
+        return matches
 
     except Exception as e:
-        print("[ERROR] Failed to get OpenAI match data:")
-        print(e)
+        print(f"[ERROR] Failed to fetch from PandaScore: {e}")
         return []
-
-    return matches
 
 def resolve_matches():
     matches = _load_matches()
-    now = datetime.utcnow()
+    if not matches:
+        return []
+
+    headers = {
+        "Authorization": f"Bearer {PANDASCORE_API_KEY}"
+    }
+
     resolved = []
     unresolved = []
 
     for match in matches:
-        match_time = datetime.strptime(match['time'], '%Y-%m-%d %H:%M:%S')
-        if match_time <= now:
-            winner = random.choice([match['team1'], match['team2']])
-            match['winner'] = winner
-            resolved.append(f"Match {match['match_id']} is over! Winner: **{winner}**")
+        url = f"https://api.pandascore.co/matches/{match['match_id']}"
+        try:
+            response = requests.get(url, headers=headers)
+            match_data = response.json()
 
-            from prediction_manager import finalize_predictions
-            finalize_predictions(match['match_id'], winner)
-        else:
+            if match_data.get("status") == "finished":
+                winner = match_data.get("winner", {}).get("name", None)
+                if winner:
+                    resolved.append(f"Match {match['match_id']} is over! Winner: **{winner}**")
+                    finalize_predictions(match['match_id'], winner)
+                else:
+                    resolved.append(f"Match {match['match_id']} is over! Winner could not be determined.")
+            else:
+                unresolved.append(match)
+        except Exception as e:
+            print(f"[ERROR] Could not fetch result for match {match['match_id']}: {e}")
             unresolved.append(match)
 
     _save_matches(unresolved)
