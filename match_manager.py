@@ -2,7 +2,7 @@ import os
 import json
 import requests
 from datetime import datetime
-from prediction_manager import predictions, update_leaderboard
+from prediction_manager import predictions, save_prediction, update_leaderboard, get_leaderboard
 
 PANDASCORE_API_KEY = os.getenv("PANDASCORE_API_KEY")
 MATCHES_FILE = "data/matches.json"
